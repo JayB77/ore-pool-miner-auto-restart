@@ -43,7 +43,7 @@ Run this command to start the miner with your custom settings. Remove brackets a
 alvarium [RPC_LINK] [WALLET_ADDRESS] [THREADS] [BUFFER]
 ```
 
-##Setup automatic miner resrart
+## Setup automatic miner resrart
 Edit the following code with the CLI command you normally use to run your miner
 ```
 // Run the CLI command
