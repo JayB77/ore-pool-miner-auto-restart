@@ -36,6 +36,15 @@ To install the alvarium mining client run this command
 cargo install alvarium-cli
 ```
 
+## Setup automatic miner resrart
+
+Edit the following code with the CLI command you normally use to run your miner
+```
+// Run the CLI command
+    let command = "alvarium [RPC_LINK] [WALLET_ADDRESS] [THREADS] [BUFFER]"; // Replace with your actual miner command
+```
+
+
 ## Run
 
 Run this command to start the miner with your custom settings. Remove brackets and fill in the parameters
@@ -43,9 +52,3 @@ Run this command to start the miner with your custom settings. Remove brackets a
 alvarium [RPC_LINK] [WALLET_ADDRESS] [THREADS] [BUFFER]
 ```
 
-## Setup automatic miner resrart
-Edit the following code with the CLI command you normally use to run your miner
-```
-// Run the CLI command
-    let command = "alvarium [RPC_LINK] [WALLET_ADDRESS] [THREADS] [BUFFER]"; // Replace with your actual miner command
-```
