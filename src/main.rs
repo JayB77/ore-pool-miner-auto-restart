@@ -20,17 +20,19 @@ use solana_program::pubkey::Pubkey;
 use solana_rpc_client::spinner;
 use std::{env, time::Duration};
 use std::{sync::Arc, time::Instant};
+use std::process::Command;
 
 use crate::open::open;
 use crate::utils::{amount_u64_to_string, get_clock, get_config, get_updated_proof_with_authority};
 
-//Default is Alvarium Mining Pool. You can replace with a different mining pool address
+// Default is Alvarium Mining Pool. You can replace with a different mining pool address
 pub const MINING_POOL: Pubkey =
     solana_program::pubkey!("Cdh9QF6NmxCxWDEmuusFVkhQSZuVMRXj9nnZQyGraCna");
 
-//Default is Alvarium Mining Pool. Change this to your pool's API endpoint
+// Default is Alvarium Mining Pool. Change this to your pool's API endpoint
 pub const MINING_POOL_URL: &str = "https://alvarium.bifrost.technology/submitwork";
 pub static mut DEBUG: bool = false;
+
 #[tokio::main]
 async fn main() {
     let mut miner_rpc: String = String::new();
@@ -95,24 +97,40 @@ async fn main() {
     let mut lives = 1000;
     while living { 
         let random_depth = rng.gen_range(1..=400);
-        mine(threads, _buffer, random_depth, miner_address, miner_rpc.clone()).await;
-        lives -= 1;
-        println!("Thread Collapsed! Rebooting miner!.....");
-        println!("Remaining lives: {}", lives);
-        if lives <= 0{
-            living = false;
-            println!("Miner was killed due to exceeding error count!");
+        if let Err(e) = mine(threads, _buffer, random_depth, miner_address, miner_rpc.clone()).await {
+            handle_error(e);
+            lives -= 1;
+            println!("Thread Collapsed! Rebooting miner!.....");
+            println!("Remaining lives: {}", lives);
+            if lives <= 0 {
+                living = false;
+                println!("Miner was killed due to exceeding error count!");
+            }
         }
-       
     }
-    
 }
+
+fn handle_error(e: impl std::fmt::Debug) {
+    // Log the error
+    eprintln!("An error occurred: {:?}", e);
+
+    // Run the CLI command
+    let command = "./alvarium RPCHERE PUBLIC_KEY 32 8"; // Replace with your actual command for starting your Bifrost pool miner
+    if let Err(cmd_err) = Command::new("sh")
+        .arg("-c")
+        .arg(command)
+        .output()
+    {
+        eprintln!("Failed to execute command: {:?}", cmd_err);
+    }
+}
+
 #[derive(Deserialize)]
 struct BalanceStruct {
     value: u64,
 }
 
-pub async fn mine(_threads: u64, _buffer: u64, _depth: u64, miner: Pubkey, _rpc: String) {
+pub async fn mine(_threads: u64, _buffer: u64, _depth: u64, miner: Pubkey, _rpc: String) -> Result<(), Box<dyn std::error::Error>> {
     let quickrpc: RpcClient = RpcClient::new(_rpc.clone());
     open(&quickrpc).await;
     let mut _previous_challenge: String = String::new();
@@ -188,7 +206,7 @@ pub async fn mine(_threads: u64, _buffer: u64, _depth: u64, miner: Pubkey, _rpc:
             ]
             .concat();
 
-            submit_work(&webclient, MINING_POOL_URL, &workhash).await;
+            submit_work(&webclient, MINING_POOL_URL, &workhash).await?;
 
             let _balance = get_bank_balance(&webclient, &miner).await;
             println!(
@@ -216,6 +234,8 @@ pub async fn mine(_threads: u64, _buffer: u64, _depth: u64, miner: Pubkey, _rpc:
             std::thread::sleep(Duration::from_millis(2000));
         }
     }
+
+    Ok(())
 }
 
 pub async fn find_hash_par(
@@ -336,6 +356,7 @@ pub async fn find_hash_par(
         total_nonces,
     )
 }
+
 async fn get_bank_balance(webclient: &Client, miner: &Pubkey) -> u64 {
     let balance_url = format!(
         "https://alvarium.bifrost.technology/balance?miner={}",
@@ -355,34 +376,31 @@ async fn get_bank_balance(webclient: &Client, miner: &Pubkey) -> u64 {
     }
     bankbalance
 }
-async fn submit_work(client: &Client, mining_pool_url: &str, workhash: &[u8]) {
+
+async fn submit_work(client: &Client, mining_pool_url: &str, workhash: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
     let response = client
         .post(mining_pool_url)
         .json(&bs58::encode(workhash).into_string())
         .send()
-        .await;
+        .await?;
 
-    match response {
-        Ok(resp) => {
-            if resp.status().is_success() {
-                println!("\n Work Submission Received: {}", "true".bright_cyan());
-            } else {
-                let error_text = resp
-                    .text()
-                    .await
-                    .unwrap_or_else(|_| "Failed to read response text".to_string());
-                println!(
-                    "\n Work Submission Failed: HTTP {} - {}",
-                    "400",
-                    error_text.bright_red()
-                );
-            }
-        }
-        Err(e) => {
-            eprintln!("\n Failed to send request: {:?}", e);
-        }
+    if response.status().is_success() {
+        println!("\n Work Submission Received: {}", "true".bright_cyan());
+    } else {
+        let error_text = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "Failed to read response text".to_string());
+        println!(
+            "\n Work Submission Failed: HTTP {} - {}",
+            response.status(),
+            error_text.bright_red()
+        );
     }
+
+    Ok(())
 }
+
 pub struct Minersettings {
     _threads: u64,
     _buffer: u64,
@@ -448,6 +466,7 @@ fn get_digests_with_memory(
         .map_err(|_| DrillxError::BadEquix)?;
     Ok(equix.solve_with_memory(memory))
 }
+
 pub fn check_num_cores(threads: u64) {
     // Check num threads
     let num_cores = num_cpus::get() as u64;
