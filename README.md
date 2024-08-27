@@ -36,7 +36,7 @@ To install the alvarium mining client run this command
 cargo install alvarium-cli
 ```
 
-## Setup automatic miner resrart
+## Setup automatic miner resrart in main.rs
 
 Edit the following code with the CLI command you normally use to run your miner
 ```
